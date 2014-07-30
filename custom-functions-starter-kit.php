@@ -27,6 +27,7 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 		private static $prefix1 = 'starter_kit_';
 		private static $text_domain1="starter-kit";
 		private static $settings_page1 = 'custom-function-starter-kit-settings';
+		private static $username="";
 		
 		
 		private static $default = array(
@@ -42,7 +43,10 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 		'check_remove_metabox' => true,
 		'check_author_link' => true,
 		'check_post_revision' => true,
-		'check_link' => true
+		'check_link' => true,
+		'check_admin' => true,
+		'check_auto_update' => true,
+		'check_rss' => true
 	);
 		/**
 		 * Ensures that the rest of the code only runs on edit.php pages
@@ -50,6 +54,7 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 		 * @since 	0.1
 		 */
 		function __construct() {
+		
 			add_action( 'load-edit.php', array( $this, 'load' ));
 			global $get_feature_image_val12;
 			$get_feature_image_val12=get_option(self::$prefix1 . 'settings');
@@ -58,8 +63,10 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 			add_filter('login_errors', create_function('$a', "return null;"));
 			}
 			if($get_feature_image_val12['check_update']==1){
-			register_activation_hook( __FILE__, 'remove_update_message' );	
+			add_action('admin_init', array(&$this, 'check_user'));
+			//register_activation_hook( __FILE__, 'remove_update_message' );	
 			}
+			
 			if($get_feature_image_val12['check_image_quality']==1){
 				//add_filter( 'jpeg_quality', array( $this,create_function( '', 'return 100;' )) );
 				add_filter( 'jpeg_quality', array( $this,'tgm_image_full_quality' ));
@@ -70,7 +77,10 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 				add_action( 'pre_ping', 'no_self_ping' );
 			}
 			if($get_feature_image_val12['check_meta']==1){
-				//remove_action( 'wp_head' , array( $this,'wp_generator' ));
+				remove_action( 'wp_head' , array( $this,'wp_generator' ));
+				remove_action( 'wp_head' , 'wp_generator' );
+			}
+			if($get_feature_image_val12['check_rss']==1){
 				add_filter('the_excerpt_rss', array( $this,'add_featured_image_to_feed', 1000, 1));
 				add_filter('the_content_feed', array( $this,'add_featured_image_to_feed', 1000, 1));
 				add_filter('the_excerpt_rss', 'add_featured_image_to_feed', 1000, 1);
@@ -96,10 +106,112 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 			if($get_feature_image_val12['check_link']==1){
 			//add_action('wp_footer', 'open_link_new_tab');
 			add_action('wp_footer', array( $this,'open_link_new_tab'));
-			}	
-			
+			}
+			if($get_feature_image_val12['check_admin']==1){
+			add_action('admin_notices', array( $this,'showAdminMessages'));
+			}
+			if($get_feature_image_val12['check_auto_update']==1){
+				define( 'WP_AUTO_UPDATE_CORE', false );
+			}
+			$this->_define_constants();
+			$this->_load_wp_includes();
+			$this->_load_wpua();
+			/*wp_enqueue_style( 'thickbox' );
+			wp_enqueue_script( 'thickbox' );
+			wp_enqueue_script( 'media-upload' );
+			add_action('admin_head', array( $this,'wpss_admin_js'));*/
+		}
+	/**
+   * Define paths
+   * @since 1.9.2
+   */
+  private function _define_constants() {
+    define('WPUA_VERSION', '1.9.13');
+    define('WPUA_FOLDER', basename(dirname(__FILE__)));
+    define('WPUA_DIR', plugin_dir_path(__FILE__));
+    define('WPUA_INC', WPUA_DIR.'includes'.'/');
+    define('WPUA_URL', plugin_dir_url(WPUA_FOLDER).WPUA_FOLDER.'/');
+    define('WPUA_INC_URL', WPUA_URL.'includes'.'/');
+  }
+
+  /**
+   * WordPress includes used in plugin
+   * @since 1.9.2
+   * @uses is_admin()
+   */
+  private function _load_wp_includes() {
+    if(!is_admin()) {
+      // wp_handle_upload
+      require_once(ABSPATH.'wp-admin/includes/file.php');
+      // wp_generate_attachment_metadata
+      require_once(ABSPATH.'wp-admin/includes/image.php');
+      // image_add_caption
+      require_once(ABSPATH.'wp-admin/includes/media.php');
+      // submit_button
+      require_once(ABSPATH.'wp-admin/includes/template.php');
+    }
+    // add_screen_option
+    require_once(ABSPATH.'wp-admin/includes/screen.php');
+  }
+
+  /**
+   * Load WP User Avatar
+   * @since 1.9.2
+   * @uses bool $wpua_tinymce
+   * @uses is_admin()
+   */
+  private function _load_wpua() {
+    global $wpua_tinymce;
+    require_once(WPUA_INC.'wpua-globals.php');
+    require_once(WPUA_INC.'wpua-functions.php');
+    require_once(WPUA_INC.'class-wp-user-avatar-admin.php');
+    require_once(WPUA_INC.'class-wp-user-avatar.php');
+    require_once(WPUA_INC.'class-wp-user-avatar-functions.php');
+    // Only needed on front pages and if NextGEN Gallery isn't installed
+    // if(!is_admin() && !defined('NEXTGEN_GALLERY_PLUGIN_DIR') && !defined('NGG_GALLERY_PLUGIN_DIR')) {
+    //   require_once(WPUA_INC.'class-wp-user-avatar-resource-manager.php');
+    //   WP_User_Avatar_Resource_Manager::init();
+    // }
+    require_once(WPUA_INC.'class-wp-user-avatar-shortcode.php');
+    require_once(WPUA_INC.'class-wp-user-avatar-subscriber.php');
+    require_once(WPUA_INC.'class-wp-user-avatar-update.php');
+    require_once(WPUA_INC.'class-wp-user-avatar-widget.php');
+    // Load TinyMCE only if enabled
+    if((bool) $wpua_tinymce == 1) {
+      require_once(WPUA_INC.'wpua-tinymce.php');
+    }
+  }
+		function wpss_admin_js() {
+			 $siteurl = get_option('siteurl');
+			 $url = $siteurl . '/wp-content/plugins/' . basename(dirname(__FILE__)) . '/js/admin_script.js';
+			 echo "<script type='text/javascript' src='$url'></script>"; 
 		}
 
+		/* Show update message to admin only
+		*@since 	0.1
+		*/
+		function check_user() {
+				$user_info = get_userdata(1);
+				if ((implode(', ', $user_info->roles))!="administrator")
+					add_filter( 'pre_site_transient_update_plugins', create_function( '$a', "return null;" ) );
+			}
+		/* Display message if username is admin
+		*@since 	0.1
+		*/
+		function showAdminMessages()
+		{
+					global $current_user;
+					get_currentuserinfo();
+					$username=$current_user->user_login;
+					if($username=="admin")
+					{
+					echo '<div id="message" class="error">';
+					echo ("<p><strong>Username as admin is not allowed.</strong></p>");
+					echo "</div>";
+					//echo "user name is admin is not allowed";
+					}
+			
+		}
 		function tgm_image_full_quality( $quality ) {
 		 
 			return 100;
@@ -221,7 +333,6 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 			 */
 
 			do_action( 'Custom_Functions_Starter_Kit_loaded' );
-
 		}
 		/* User see only their post
 		*@since 	0.1
@@ -238,14 +349,14 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 		 * To remove update message except admin
 		 *@since 	0.1
 		 */
-		function remove_update_message() {
+		/*function remove_update_message() {
 		   global $user_login;
 			   get_currentuserinfo();
 			   if (!current_user_can('update_plugins')) { // checks to see if current user can update plugins 
 				add_action( 'init', create_function( '$a', "remove_action( 'init', 'wp_version_check' );" ), 2 );
 				add_filter( 'pre_option_update_core', create_function( '$a', "return null;" ) );
 			   }
-		}
+		}*/
 		/* Allow media file to upload from contributors
 		*@since 	0.1
 		*/
@@ -263,12 +374,13 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 		/* Remove self ping
 		*@since 	0.1
 		*/
-		function no_self_ping( $links ) {
+		function no_self_ping( &$links ) {
 			$home = get_option( 'home' );
 			foreach ( $links as $l => $link )
-				if ( 0 === strpos( $link, $home ) )
-					unset($links[$l]);
+			if ( 0 === strpos( $link, $home ) )
+			unset($links[$l]);
 		}
+		
 		/* Add featured image to feed
 		*@since 	0.1
 		*/
@@ -455,10 +567,23 @@ if ( !class_exists( 'custom-functions-starter-kit' ) ) {
 					'check_remove_metabox'	=> isset($_POST[self::$prefix1 . 'check_remove_metabox']) && $_POST[self::$prefix1 . 'check_remove_metabox'] ? true : false,
 					'check_author_link'	=> isset($_POST[self::$prefix1 . 'check_author_link']) && $_POST[self::$prefix1 . 'check_author_link'] ? true : false,
 					'check_post_revision'	=> isset($_POST[self::$prefix1 . 'check_post_revision']) && $_POST[self::$prefix1 . 'check_post_revision'] ? true : false,
-					'check_link'	=> isset($_POST[self::$prefix1 . 'check_link']) && $_POST[self::$prefix1 . 'check_link'] ? true : false
+					'check_link'	=> isset($_POST[self::$prefix1 . 'check_link']) && $_POST[self::$prefix1 . 'check_link'] ? true : false,
+					'check_admin'	=> isset($_POST[self::$prefix1 . 'check_admin']) && $_POST[self::$prefix1 . 'check_admin'] ? true : false,
+					'check_auto_update'	=> isset($_POST[self::$prefix1 . 'check_auto_update']) && $_POST[self::$prefix1 . 'check_auto_update'] ? true : false,
+					'check_rss'	=> isset($_POST[self::$prefix1 . 'check_rss']) && $_POST[self::$prefix1 . 'check_rss'] ? true : false
+					
 					
 				);
-				update_option(self::$prefix1 . 'settings', $settings);			
+				update_option(self::$prefix1 . 'settings', $settings);
+				
+				
+/*				
+//add_action('admin_enqueue_scripts', 'my_admin_scripts');
+wp_enqueue_media();
+ wp_register_script( 'my-plugin-script', plugins_url( 'js/image.js', __FILE__ ) );
+		//wp_register_script('my-admin-js', WP_PLUGIN_URL.'/js/image.js', array('jquery'));
+		wp_enqueue_script('my-plugin-script');*/
+				
 			}
 			require('admin/settings.php');
 		}
